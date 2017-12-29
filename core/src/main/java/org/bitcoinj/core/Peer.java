@@ -67,19 +67,19 @@ public class Peer extends PeerSocketHandler {
     private final Context context;
 
     private final CopyOnWriteArrayList<ListenerRegistration<BlocksDownloadedEventListener>> blocksDownloadedEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<BlocksDownloadedEventListener>>();
+        = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ListenerRegistration<ChainDownloadStartedEventListener>> chainDownloadStartedEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<ChainDownloadStartedEventListener>>();
+        = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ListenerRegistration<PeerConnectedEventListener>> connectedEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<PeerConnectedEventListener>>();
+        = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ListenerRegistration<PeerDisconnectedEventListener>> disconnectedEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<PeerDisconnectedEventListener>>();
+        = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ListenerRegistration<GetDataEventListener>> getDataEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<GetDataEventListener>>();
+        = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ListenerRegistration<PreMessageReceivedEventListener>> preMessageReceivedEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<PreMessageReceivedEventListener>>();
+        = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ListenerRegistration<OnTransactionBroadcastListener>> onTransactionEventListeners
-        = new CopyOnWriteArrayList<ListenerRegistration<OnTransactionBroadcastListener>>();
+        = new CopyOnWriteArrayList<>();
     // Whether to try and download blocks and transactions from this peer. Set to false by PeerGroup if not the
     // primary peer. This is to avoid redundant work and concurrency problems with downloading the same chain
     // in parallel.
@@ -125,14 +125,14 @@ public class Peer extends PeerSocketHandler {
     //
     // It is important to avoid a nasty edge case where we can end up with parallel chain downloads proceeding
     // simultaneously if we were to receive a newly solved block whilst parts of the chain are streaming to us.
-    private final HashSet<Sha256Hash> pendingBlockDownloads = new HashSet<Sha256Hash>();
+    private final HashSet<Sha256Hash> pendingBlockDownloads = new HashSet<>();
     // Keep references to TransactionConfidence objects for transactions that were announced by a remote peer, but
     // which we haven't downloaded yet. These objects are de-duplicated by the TxConfidenceTable class.
     // Once the tx is downloaded (by some peer), the Transaction object that is created will have a reference to
     // the confidence object held inside it, and it's then up to the event listeners that receive the Transaction
     // to keep it pinned to the root set if they care about this data.
     @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
-    private final HashSet<TransactionConfidence> pendingTxDownloads = new HashSet<TransactionConfidence>();
+    private final HashSet<TransactionConfidence> pendingTxDownloads = new HashSet<>();
     // The lowest version number we're willing to accept. Lower than this will result in an immediate disconnect.
     private volatile int vMinProtocolVersion;
     // When an API user explicitly requests a block or transaction from a peer, the InventoryItem is put here
@@ -232,12 +232,12 @@ public class Peer extends PeerSocketHandler {
         this.vDownloadTxDependencyDepth = chain != null ? downloadTxDependencyDepth : 0;
         this.blockChain = chain;  // Allowed to be null.
         this.vDownloadData = chain != null;
-        this.getDataFutures = new CopyOnWriteArrayList<GetDataRequest>();
-        this.getAddrFutures = new LinkedList<SettableFuture<AddressMessage>>();
+        this.getDataFutures = new CopyOnWriteArrayList<>();
+        this.getAddrFutures = new LinkedList<>();
         this.fastCatchupTimeSecs = params.getGenesisBlock().getTimeSeconds();
-        this.pendingPings = new CopyOnWriteArrayList<PendingPing>();
+        this.pendingPings = new CopyOnWriteArrayList<>();
         this.vMinProtocolVersion = params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.PONG);
-        this.wallets = new CopyOnWriteArrayList<Wallet>();
+        this.wallets = new CopyOnWriteArrayList<>();
         this.context = Context.get();
 
         this.versionHandshakeFuture.addListener(new Runnable() {
@@ -350,7 +350,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is called when messages are received. */
     public void addGetDataEventListener(Executor executor, GetDataEventListener listener) {
-        getDataEventListeners.add(new ListenerRegistration<GetDataEventListener>(listener, executor));
+        getDataEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     /** Registers a listener that is called when a transaction is broadcast across the network */
@@ -360,7 +360,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is called when a transaction is broadcast across the network */
     public void addOnTransactionBroadcastListener(Executor executor, OnTransactionBroadcastListener listener) {
-        onTransactionEventListeners.add(new ListenerRegistration<OnTransactionBroadcastListener>(listener, executor));
+        onTransactionEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     /** Registers a listener that is called immediately before a message is received */
@@ -370,7 +370,7 @@ public class Peer extends PeerSocketHandler {
 
     /** Registers a listener that is called immediately before a message is received */
     public void addPreMessageReceivedEventListener(Executor executor, PreMessageReceivedEventListener listener) {
-        preMessageReceivedEventListeners.add(new ListenerRegistration<PreMessageReceivedEventListener>(listener, executor));
+        preMessageReceivedEventListeners.add(new ListenerRegistration<>(listener, executor));
     }
 
     public boolean removeBlocksDownloadedEventListener(BlocksDownloadedEventListener listener) {
@@ -613,6 +613,13 @@ public class Peer extends PeerSocketHandler {
             close();
             return;
         }
+        if ((vPeerVersionMessage.localServices
+                & VersionMessage.NODE_BITCOIN_CASH) == VersionMessage.NODE_BITCOIN_CASH) {
+            log.info("{}: Peer follows an incompatible block chain.", this);
+            // Shut down the channel gracefully.
+            close();
+            return;
+        }
         if (vPeerVersionMessage.bestHeight < 0)
             // In this case, it's a protocol violation.
             throw new ProtocolException("Peer reports invalid best height: " + vPeerVersionMessage.bestHeight);
@@ -692,9 +699,9 @@ public class Peer extends PeerSocketHandler {
     protected void processAlert(AlertMessage m) {
         try {
             if (m.isSignatureValid()) {
-                log.info("Received alert from peer {}: {}", this, m.getStatusBar());
+                log.debug("Received alert from peer {}: {}", this, m.getStatusBar());
             } else {
-                log.warn("Received alert with invalid signature from peer {}: {}", this, m.getStatusBar());
+                log.debug("Received alert with invalid signature from peer {}: {}", this, m.getStatusBar());
             }
         } catch (Throwable t) {
             // Signature checking can FAIL on Android platforms before Gingerbread apparently due to bugs in their
@@ -788,7 +795,7 @@ public class Peer extends PeerSocketHandler {
 
     protected void processGetData(GetDataMessage getdata) {
         log.info("{}: Received getdata message: {}", getAddress(), getdata.toString());
-        ArrayList<Message> items = new ArrayList<Message>();
+        ArrayList<Message> items = new ArrayList<>();
         for (ListenerRegistration<GetDataEventListener> registration : getDataEventListeners) {
             if (registration.executor != Threading.SAME_THREAD) continue;
             List<Message> listenerItems = registration.listener.getData(this, getdata);
@@ -934,7 +941,7 @@ public class Peer extends PeerSocketHandler {
         TransactionConfidence.ConfidenceType txConfidence = tx.getConfidence().getConfidenceType();
         Preconditions.checkArgument(txConfidence != TransactionConfidence.ConfidenceType.BUILDING);
         log.info("{}: Downloading dependencies of {}", getAddress(), tx.getHashAsString());
-        final LinkedList<Transaction> results = new LinkedList<Transaction>();
+        final LinkedList<Transaction> results = new LinkedList<>();
         // future will be invoked when the entire dependency tree has been walked and the results compiled.
         final ListenableFuture<Object> future = downloadDependenciesInternal(vDownloadTxDependencyDepth, 0, tx,
                 new Object(), results);
@@ -964,7 +971,7 @@ public class Peer extends PeerSocketHandler {
         // or depends on a no-fee transaction.
 
         // We may end up requesting transactions that we've already downloaded and thrown away here.
-        Set<Sha256Hash> needToRequest = new CopyOnWriteArraySet<Sha256Hash>();
+        Set<Sha256Hash> needToRequest = new CopyOnWriteArraySet<>();
         for (TransactionInput input : tx.getInputs()) {
             // There may be multiple inputs that connect to the same transaction.
             needToRequest.add(input.getOutpoint().getHash());
@@ -1147,7 +1154,7 @@ public class Peer extends PeerSocketHandler {
                     // that the new filter is now in use (which we have to simulate with a ping/pong), and then we can
                     // safely restart the chain download with the new filter that contains a new set of lookahead keys.
                     log.info("Bloom filter exhausted whilst processing block {}, discarding", m.getHash());
-                    awaitingFreshFilter = new LinkedList<Sha256Hash>();
+                    awaitingFreshFilter = new LinkedList<>();
                     awaitingFreshFilter.add(m.getHash());
                     awaitingFreshFilter.addAll(blockChain.drainOrphanBlocks());
                     return;   // Chain download process is restarted via a call to setBloomFilter.
@@ -1292,15 +1299,19 @@ public class Peer extends PeerSocketHandler {
         List<InventoryItem> items = inv.getItems();
 
         // Separate out the blocks and transactions, we'll handle them differently
-        List<InventoryItem> transactions = new LinkedList<InventoryItem>();
-        List<InventoryItem> blocks = new LinkedList<InventoryItem>();
+
+        //
+        // Dash Specific Inventory Items
+        //
         List<InventoryItem> instantxLockRequests = new LinkedList<InventoryItem>();
         List<InventoryItem> instantxLocks = new LinkedList<InventoryItem>();
         List<InventoryItem> masternodePings = new LinkedList<InventoryItem>();
         List<InventoryItem> masternodeBroadcasts = new LinkedList<InventoryItem>();
         List<InventoryItem> sporks = new LinkedList<InventoryItem>();
 
-        //InstantSend instantSend = InstantSend.get(blockChain);
+        List<InventoryItem> transactions = new LinkedList<>();
+        List<InventoryItem> blocks = new LinkedList<>();
+
 
         for (InventoryItem item : items) {
             switch (item.type) {
@@ -1669,7 +1680,7 @@ public class Peer extends PeerSocketHandler {
         // sends us the data we requested in a "headers" message.
 
         // TODO: Block locators should be abstracted out rather than special cased here.
-        List<Sha256Hash> blockLocator = new ArrayList<Sha256Hash>(51);
+        List<Sha256Hash> blockLocator = new ArrayList<>(51);
         // For now we don't do the exponential thinning as suggested here:
         //
         //   https://en.bitcoin.it/wiki/Protocol_specification#getblocks
@@ -2055,7 +2066,7 @@ public class Peer extends PeerSocketHandler {
             SettableFuture<UTXOsMessage> future = SettableFuture.create();
             // Add to the list of in flight requests.
             if (getutxoFutures == null)
-                getutxoFutures = new LinkedList<SettableFuture<UTXOsMessage>>();
+                getutxoFutures = new LinkedList<>();
             getutxoFutures.add(future);
             sendMessage(new GetUTXOsMessage(params, outPoints, includeMempool));
             return future;

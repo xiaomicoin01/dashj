@@ -19,6 +19,8 @@ package org.bitcoinj.core;
 
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
+
+import org.bitcoinj.core.listeners.BlockChainListener;
 import org.bitcoinj.utils.*;
 import org.bitcoinj.wallet.Wallet;
 
@@ -146,8 +148,8 @@ public class TransactionConfidence {
 
     public TransactionConfidence(Sha256Hash hash) {
         // Assume a default number of peers for our set.
-        broadcastBy = new CopyOnWriteArrayList<PeerAddress>();
-        listeners = new CopyOnWriteArrayList<ListenerRegistration<Listener>>();
+        broadcastBy = new CopyOnWriteArrayList<>();
+        listeners = new CopyOnWriteArrayList<>();
         this.hash = hash;
     }
 
@@ -213,7 +215,7 @@ public class TransactionConfidence {
      */
     public void addEventListener(Executor executor, Listener listener) {
         checkNotNull(listener);
-        listeners.addIfAbsent(new ListenerRegistration<Listener>(listener, executor));
+        listeners.addIfAbsent(new ListenerRegistration<>(listener, executor));
         pinnedConfidenceObjects.add(this);
     }
 
@@ -364,6 +366,10 @@ public class TransactionConfidence {
                         getAppearedAtChainHeight(), getDepthInBlocks()));
                 break;
         }
+
+        //
+        // Dash Specific types for InstantSend
+        //
         switch(getIXType())
         {
             case IX_LOCKED:

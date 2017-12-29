@@ -49,7 +49,7 @@ public class ScriptBuilder {
 
     /** Creates a fresh ScriptBuilder with the given program as the starting point. */
     public ScriptBuilder(Script template) {
-        chunks = new ArrayList<ScriptChunk>(template.getChunks());
+        chunks = new ArrayList<>(template.getChunks());
     }
 
     /** Adds the given chunk to the end of the program */
@@ -112,11 +112,7 @@ public class ScriptBuilder {
      * shortest encoding possible.
      */
     public ScriptBuilder number(long num) {
-        if (num >= 0 && num < 16) {
-            return smallNum((int) num);
-        } else {
-            return bigNum(num);
-        }
+        return number(chunks.size(), num);
     }
 
     /**
@@ -124,8 +120,10 @@ public class ScriptBuilder {
      * uses shortest encoding possible.
      */
     public ScriptBuilder number(int index, long num) {
-        if (num >= 0 && num < 16) {
-            return addChunk(index, new ScriptChunk(Script.encodeToOpN((int) num), null));
+        if (num == -1) {
+            return op(index, OP_1NEGATE);
+        } else if (num >= 0 && num <= 16) {
+            return smallNum(index, (int) num);
         } else {
             return bigNum(index, num);
         }
@@ -135,7 +133,7 @@ public class ScriptBuilder {
      * Adds the given number as a OP_N opcode to the end of the program.
      * Only handles values 0-16 inclusive.
      * 
-     * @see #number(int)
+     * @see #number(long)
      */
     public ScriptBuilder smallNum(int num) {
         return smallNum(chunks.size(), num);
@@ -146,7 +144,7 @@ public class ScriptBuilder {
      * it will accept numbers in the range 0-16 inclusive, the encoding would be
      * considered non-standard.
      * 
-     * @see #number(int)
+     * @see #number(long)
      */
     protected ScriptBuilder bigNum(long num) {
         return bigNum(chunks.size(), num);
@@ -156,7 +154,7 @@ public class ScriptBuilder {
      * Adds the given number as a OP_N opcode to the given index in the program.
      * Only handles values 0-16 inclusive.
      * 
-     * @see #number(int)
+     * @see #number(long)
      */
     public ScriptBuilder smallNum(int index, int num) {
         checkArgument(num >= 0, "Cannot encode negative numbers with smallNum");
@@ -170,7 +168,7 @@ public class ScriptBuilder {
      * it will accept numbers in the range 0-16 inclusive, the encoding would be
      * considered non-standard.
      * 
-     * @see #number(int)
+     * @see #number(long)
      */
     protected ScriptBuilder bigNum(int index, long num) {
         final byte[] data;
@@ -178,7 +176,7 @@ public class ScriptBuilder {
         if (num == 0) {
             data = new byte[0];
         } else {
-            Stack<Byte> result = new Stack<Byte>();
+            Stack<Byte> result = new Stack<>();
             final boolean neg = num < 0;
             long absvalue = Math.abs(num);
 
@@ -276,7 +274,7 @@ public class ScriptBuilder {
 
     /** Create a program that satisfies an OP_CHECKMULTISIG program. */
     public static Script createMultiSigInputScript(List<TransactionSignature> signatures) {
-        List<byte[]> sigs = new ArrayList<byte[]>(signatures.size());
+        List<byte[]> sigs = new ArrayList<>(signatures.size());
         for (TransactionSignature signature : signatures) {
             sigs.add(signature.encodeToBitcoin());
         }
@@ -300,7 +298,7 @@ public class ScriptBuilder {
      */
     public static Script createP2SHMultiSigInputScript(@Nullable List<TransactionSignature> signatures,
                                                        Script multisigProgram) {
-        List<byte[]> sigs = new ArrayList<byte[]>();
+        List<byte[]> sigs = new ArrayList<>();
         if (signatures == null) {
             // create correct number of empty signatures
             int numSigs = multisigProgram.getNumberOfSignaturesRequiredToSpend();
@@ -422,7 +420,7 @@ public class ScriptBuilder {
      * redeem script in the lexicographical sorting order.
      */
     public static Script createRedeemScript(int threshold, List<ECKey> pubkeys) {
-        pubkeys = new ArrayList<ECKey>(pubkeys);
+        pubkeys = new ArrayList<>(pubkeys);
         Collections.sort(pubkeys, ECKey.PUBKEY_COMPARATOR);
         return ScriptBuilder.createMultiSigOutputScript(threshold, pubkeys);
     }

@@ -158,11 +158,10 @@ public class ForwardingService {
                     // The wallet has changed now, it'll get auto saved shortly or when the app shuts down.
                     System.out.println("Sent coins onwards! Transaction hash is " + sendResult.tx.getHashAsString());
                 }
-            }, MoreExecutors.sameThreadExecutor());
 
-            //MasternodeDB.dumpMasternodes();
-            FlatDB<MasternodeManager> mndb = new FlatDB<MasternodeManager>(kit.directory().getAbsolutePath(),"mncache.dat", "magicMasternodeCache");
-            mndb.dump(Context.get().masternodeManager);
+            }, MoreExecutors.directExecutor());
+        FlatDB<MasternodeManager> mndb = new FlatDB<MasternodeManager>(kit.directory().getAbsolutePath(),"mncache.dat", "magicMasternodeCache");
+        mndb.dump(Context.get().masternodeManager);
         } catch (KeyCrypterException | InsufficientMoneyException e) {
             // We don't use encrypted wallets in this example - can never happen.
             throw new RuntimeException(e);

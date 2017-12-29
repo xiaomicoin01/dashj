@@ -112,7 +112,7 @@ public abstract class NetworkParameters {
     protected String[] dnsSeeds;
     protected int[] addrSeeds;
     protected HttpDiscovery.Details[] httpSeeds = {};
-    protected Map<Integer, Sha256Hash> checkpoints = new HashMap<Integer, Sha256Hash>();
+    protected Map<Integer, Sha256Hash> checkpoints = new HashMap<>();
     protected transient MessageSerializer defaultSerializer = null;
 
 
@@ -393,7 +393,7 @@ public abstract class NetworkParameters {
         return true;
     }
 
-    /** How many blocks pass between difficulty adjustment periods. Bitcoin standardises this to be 2015. */
+    /** How many blocks pass between difficulty adjustment periods. Bitcoin standardises this to be 2016. */
     public int getInterval() {
         return interval;
     }
@@ -453,7 +453,7 @@ public abstract class NetworkParameters {
 
     /**
      * Return the default serializer for this network. This is a shared serializer.
-     * @return 
+     * @return the default serializer for this network.
      */
     public final MessageSerializer getDefaultSerializer() {
         // Construct a default serializer if we don't have one
@@ -479,7 +479,7 @@ public abstract class NetworkParameters {
     public abstract BitcoinSerializer getSerializer(boolean parseRetain);
 
     /**
-     * The number of blocks in the last {@link getMajorityWindow()} blocks
+     * The number of blocks in the last {@link #getMajorityWindow()} blocks
      * at which to trigger a notice to the user to upgrade their client, where
      * the client does not understand those blocks.
      */
@@ -488,7 +488,7 @@ public abstract class NetworkParameters {
     }
 
     /**
-     * The number of blocks in the last {@link getMajorityWindow()} blocks
+     * The number of blocks in the last {@link #getMajorityWindow()} blocks
      * at which to enforce the requirement that all new blocks are of the
      * newer type (i.e. outdated blocks are rejected).
      */

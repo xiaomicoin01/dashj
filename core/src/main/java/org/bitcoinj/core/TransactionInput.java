@@ -18,6 +18,8 @@
 package org.bitcoinj.core;
 
 import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptError;
+import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.wallet.DefaultRiskAnalysis;
 import org.bitcoinj.wallet.KeyBag;
 import org.bitcoinj.wallet.RedeemData;
@@ -46,6 +48,21 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class TransactionInput extends ChildMessage {
     /** Magic sequence number that indicates there is no sequence number. */
     public static final long NO_SEQUENCE = 0xFFFFFFFFL;
+    /**
+     * BIP68: If this flag set, sequence is NOT interpreted as a relative lock-time.
+     */
+    public static final long SEQUENCE_LOCKTIME_DISABLE_FLAG = 1L << 31;
+    /**
+     * BIP68: If sequence encodes a relative lock-time and this flag is set, the relative lock-time has units of 512
+     * seconds, otherwise it specifies blocks with a granularity of 1.
+     */
+    public static final long SEQUENCE_LOCKTIME_TYPE_FLAG = 1L << 22;
+    /**
+     * BIP68: If sequence encodes a relative lock-time, this mask is applied to extract that lock-time from the sequence
+     * field.
+     */
+    public static final long SEQUENCE_LOCKTIME_MASK = 0x0000ffff;
+
     private static final byte[] EMPTY_ARRAY = new byte[0];
     // Magic outpoint index that indicates the input is in fact unconnected.
     private static final long UNCONNECTED = 0xFFFFFFFFL;
@@ -165,14 +182,14 @@ public class TransactionInput extends ChildMessage {
         Script script = scriptSig == null ? null : scriptSig.get();
         if (script == null) {
             script = new Script(scriptBytes);
-            scriptSig = new WeakReference<Script>(script);
+            scriptSig = new WeakReference<>(script);
         }
         return script;
     }
 
     /** Set the given program as the scriptSig that is supposed to satisfy the connected output script. */
     public void setScriptSig(Script scriptSig) {
-        this.scriptSig = new WeakReference<Script>(checkNotNull(scriptSig));
+        this.scriptSig = new WeakReference<>(checkNotNull(scriptSig));
         // TODO: This should all be cleaned up so we have a consistent internal representation.
         setScriptBytes(scriptSig.getProgram());
     }
@@ -186,6 +203,7 @@ public class TransactionInput extends ChildMessage {
     public Address getFromAddress() throws ScriptException {
         if (isCoinBase()) {
             throw new ScriptException(
+                    ScriptError.SCRIPT_ERR_UNKNOWN_ERROR,
                     "This is a coinbase transaction which generates new coins. It does not have a from address.");
         }
         return getScriptSig().getFromAddress(params);
@@ -374,11 +392,23 @@ public class TransactionInput extends ChildMessage {
      * @return true if the disconnection took place, false if it was not connected.
      */
     public boolean disconnect() {
-        if (outpoint.fromTx == null) return false;
-        TransactionOutput output = outpoint.fromTx.getOutput((int) outpoint.getIndex());
-        if (output.getSpentBy() == this) {
-            output.markAsUnspent();
+        TransactionOutput connectedOutput;
+        if (outpoint.fromTx != null) {
+            // The outpoint is connected using a "standard" wallet, disconnect it.
+            connectedOutput = outpoint.fromTx.getOutput((int) outpoint.getIndex());
             outpoint.fromTx = null;
+        } else if (outpoint.connectedOutput != null) {
+            // The outpoint is connected using a UTXO based wallet, disconnect it.
+            connectedOutput = outpoint.connectedOutput;
+            outpoint.connectedOutput = null;
+        } else {
+            // The outpoint is not connected, do nothing.
+            return false;
+        }
+
+        if (connectedOutput != null && connectedOutput.getSpentBy() == this) {
+            // The outpoint was connected to an output, disconnect the output.
+            connectedOutput.markAsUnspent();
             return true;
         } else {
             return false;
@@ -398,6 +428,14 @@ public class TransactionInput extends ChildMessage {
      */
     public boolean isOptInFullRBF() {
         return sequence < NO_SEQUENCE - 1;
+    }
+
+    /**
+     * Returns whether this input, if it belongs to a version 2 (or higher) transaction, has
+     * <a href="https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki">relative lock-time</a> enabled.
+     */
+    public boolean hasRelativeLockTime() {
+        return (sequence & SEQUENCE_LOCKTIME_DISABLE_FLAG) == 0;
     }
 
     /**

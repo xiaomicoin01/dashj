@@ -130,7 +130,7 @@ public class DeterministicKey extends ECKey {
      * information about its parent key.  Invoked when deserializing, but otherwise not something that
      * you normally should use.
      */
-    private DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             LazyECPoint publicAsPoint,
                             @Nullable DeterministicKey parent,
@@ -150,7 +150,7 @@ public class DeterministicKey extends ECKey {
      * information about its parent key.  Invoked when deserializing, but otherwise not something that
      * you normally should use.
      */
-    private DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
+    public DeterministicKey(ImmutableList<ChildNumber> childNumberPath,
                             byte[] chainCode,
                             BigInteger priv,
                             @Nullable DeterministicKey parent,
@@ -355,13 +355,13 @@ public class DeterministicKey extends ECKey {
     public ECDSASignature sign(Sha256Hash input, @Nullable KeyParameter aesKey) throws KeyCrypterException {
         if (isEncrypted()) {
             // If the key is encrypted, ECKey.sign will decrypt it first before rerunning sign. Decryption walks the
-            // key heirarchy to find the private key (see below), so, we can just run the inherited method.
+            // key hierarchy to find the private key (see below), so, we can just run the inherited method.
             return super.sign(input, aesKey);
         } else {
             // If it's not encrypted, derive the private via the parents.
             final BigInteger privateKey = findOrDerivePrivateKey();
             if (privateKey == null) {
-                // This key is a part of a public-key only heirarchy and cannot be used for signing
+                // This key is a part of a public-key only hierarchy and cannot be used for signing
                 throw new MissingPrivateKeyException();
             }
             return super.doSign(input, privateKey);
@@ -583,7 +583,7 @@ public class DeterministicKey extends ECKey {
     }
 
     /**
-     * Verifies equality of all fields but NOT the parent pointer (thus the same key derived in two separate heirarchy
+     * Verifies equality of all fields but NOT the parent pointer (thus the same key derived in two separate hierarchy
      * objects will equal each other.
      */
     @Override
@@ -615,13 +615,14 @@ public class DeterministicKey extends ECKey {
     }
 
     @Override
-    public void formatKeyWithAddress(boolean includePrivateKeys, StringBuilder builder, NetworkParameters params) {
+    public void formatKeyWithAddress(boolean includePrivateKeys, @Nullable KeyParameter aesKey, StringBuilder builder,
+            NetworkParameters params) {
         final Address address = toAddress(params);
         builder.append("  addr:").append(address);
         builder.append("  hash160:").append(Utils.HEX.encode(getPubKeyHash()));
         builder.append("  (").append(getPathAsString()).append(")\n");
         if (includePrivateKeys) {
-            builder.append("  ").append(toStringWithPrivate(params)).append("\n");
+            builder.append("  ").append(toStringWithPrivate(aesKey, params)).append("\n");
         }
     }
 }

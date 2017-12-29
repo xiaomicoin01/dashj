@@ -55,28 +55,39 @@ public class Utils {
     public static final String BITCOIN_SIGNED_MESSAGE_HEADER = "DarkCoin Signed Message:\n";  //Dash use DarkCoin here
     public static final byte[] BITCOIN_SIGNED_MESSAGE_HEADER_BYTES = BITCOIN_SIGNED_MESSAGE_HEADER.getBytes(Charsets.UTF_8);
 
-    private static final Joiner SPACE_JOINER = Joiner.on(" ");
+    public static final Joiner SPACE_JOINER = Joiner.on(" ");
 
     private static BlockingQueue<Boolean> mockSleepQueue;
 
     /**
-     * The regular {@link java.math.BigInteger#toByteArray()} method isn't quite what we often need: it appends a
-     * leading zero to indicate that the number is positive and may need padding.
-     *
+     * <p>
+     * The regular {@link java.math.BigInteger#toByteArray()} includes the sign bit of the number and 
+     * might result in an extra byte addition. This method removes this extra byte.
+     * </p>
+     * <p>
+     * Assuming only positive numbers, it's possible to discriminate if an extra byte
+     * is added by checking if the first element of the array is 0 (0000_0000).
+     * Due to the minimal representation provided by BigInteger, it means that the bit sign
+     * is the least significant bit 0000_000<b>0</b> .
+     * Otherwise the representation is not minimal.
+     * For example, if the sign bit is 0000_00<b>0</b>0, then the representation is not minimal due to the rightmost zero.
+     * </p>
      * @param b the integer to format into a byte array
      * @param numBytes the desired size of the resulting byte array
      * @return numBytes byte long array.
      */
     public static byte[] bigIntegerToBytes(BigInteger b, int numBytes) {
-        if (b == null) {
-            return null;
-        }
-        byte[] bytes = new byte[numBytes];
-        byte[] biBytes = b.toByteArray();
-        int start = (biBytes.length == numBytes + 1) ? 1 : 0;
-        int length = Math.min(biBytes.length, numBytes);
-        System.arraycopy(biBytes, start, bytes, numBytes - length, length);
-        return bytes;        
+        checkArgument(b.signum() >= 0, "b must be positive or zero");
+        checkArgument(numBytes > 0, "numBytes must be positive");
+        byte[] src = b.toByteArray();
+        byte[] dest = new byte[numBytes];
+        boolean isFirstByteOnlyForSign = src[0] == 0;
+        int length = isFirstByteOnlyForSign ? src.length - 1 : src.length;
+        checkArgument(length <= numBytes, "The given number does not fit in " + numBytes);
+        int srcPos = isFirstByteOnlyForSign ? 1 : 0;
+        int destPos = numBytes - length;
+        System.arraycopy(src, srcPos, dest, destPos, length);
+        return dest;
     }
 
     public static void uint32ToByteArrayBE(long val, byte[] out, int offset) {
@@ -436,18 +447,6 @@ public class Utils {
         return iso8601.format(dateTime);
     }
 
-    /**
-     * Returns a string containing the string representation of the given items,
-     * delimited by a single space character.
-     *
-     * @param items the items to join
-     * @param <T> the item type
-     * @return the joined space-delimited string
-     */
-    public static <T> String join(Iterable<T> items) {
-        return SPACE_JOINER.join(items);
-    }
-
     public static byte[] copyOf(byte[] in, int length) {
         byte[] out = new byte[length];
         System.arraycopy(in, 0, out, 0, Math.min(length, in.length));
@@ -589,7 +588,7 @@ public class Utils {
     /** Enable or disable mock sleep.  If enabled, set mock time to current time. */
     public static void setMockSleep(boolean isEnable) {
         if (isEnable) {
-            mockSleepQueue = new ArrayBlockingQueue<Boolean>(1);
+            mockSleepQueue = new ArrayBlockingQueue<>(1);
             mockTime = new Date(System.currentTimeMillis());
         } else {
             mockSleepQueue = null;
@@ -626,7 +625,7 @@ public class Utils {
 
     public static int maxOfMostFreq(int... items) {
         // Java 6 sucks.
-        ArrayList<Integer> list = new ArrayList<Integer>(items.length);
+        ArrayList<Integer> list = new ArrayList<>(items.length);
         for (int item : items) list.add(item);
         return maxOfMostFreq(list);
     }

@@ -22,6 +22,7 @@ import org.bitcoinj.core.TransactionConfidence.ConfidenceType;
 import org.bitcoinj.crypto.KeyCrypter;
 import org.bitcoinj.crypto.KeyCrypterScrypt;
 import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.signers.LocalTransactionSigner;
 import org.bitcoinj.signers.TransactionSigner;
 import org.bitcoinj.utils.ExchangeRate;
@@ -31,6 +32,7 @@ import org.bitcoinj.wallet.Protos.Wallet.EncryptionType;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedInputStream;
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.WireFormat;
 
@@ -78,6 +80,8 @@ public class WalletProtobufSerializer {
     protected Map<ByteString, Transaction> txMap;
 
     private boolean requireMandatoryExtensions = true;
+    private boolean requireAllExtensionsKnown = false;
+    private int walletWriteBufferSize = CodedOutputStream.DEFAULT_BUFFER_SIZE;
 
     public interface WalletFactory {
         Wallet create(NetworkParameters params, KeyChainGroup keyChainGroup);
@@ -96,7 +100,7 @@ public class WalletProtobufSerializer {
     }
 
     public WalletProtobufSerializer(WalletFactory factory) {
-        txMap = new HashMap<ByteString, Transaction>();
+        txMap = new HashMap<>();
         this.factory = factory;
         this.keyChainFactory = new DefaultKeyChainFactory();
     }
@@ -115,13 +119,30 @@ public class WalletProtobufSerializer {
     }
 
     /**
+     * If this property is set to true, the wallet will fail to load if  any found extensions are unknown..
+     */
+    public void setRequireAllExtensionsKnown(boolean value) {
+        requireAllExtensionsKnown = value;
+    }
+
+    /**
+     * Change buffer size for writing wallet to output stream. Default is {@link com.google.protobuf.CodedOutputStream#DEFAULT_BUFFER_SIZE}
+     * @param walletWriteBufferSize - buffer size in bytes
+     */
+    public void setWalletWriteBufferSize(int walletWriteBufferSize) {
+        this.walletWriteBufferSize = walletWriteBufferSize;
+    }
+
+    /**
      * Formats the given wallet (transactions and keys) to the given output stream in protocol buffer format.<p>
      *
      * Equivalent to <tt>walletToProto(wallet).writeTo(output);</tt>
      */
     public void writeWallet(Wallet wallet, OutputStream output) throws IOException {
         Protos.Wallet walletProto = walletToProto(wallet);
-        walletProto.writeTo(output);
+        final CodedOutputStream codedOutput = CodedOutputStream.newInstance(output, this.walletWriteBufferSize);
+        walletProto.writeTo(codedOutput);
+        codedOutput.flush();
     }
 
     /**
@@ -406,7 +427,7 @@ public class WalletProtobufSerializer {
      * Wallet object with {@code forceReset} set {@code true}. It won't work.</p>
      *
      * <p>If {@code forceReset} is {@code true}, then no transactions are loaded from the wallet, and it is configured
-     * to replay transactions from the blockchain (as if the wallet had been loaded and {@link Wallet.reset}
+     * to replay transactions from the blockchain (as if the wallet had been loaded and {@link Wallet#reset()}
      * had been called immediately thereafter).
      *
      * <p>A wallet can be unreadable for various reasons, such as inability to open the file, corrupt data, internally
@@ -455,7 +476,7 @@ public class WalletProtobufSerializer {
      * Wallet object with {@code forceReset} set {@code true}. It won't work.</p>
      *
      * <p>If {@code forceReset} is {@code true}, then no transactions are loaded from the wallet, and it is configured
-     * to replay transactions from the blockchain (as if the wallet had been loaded and {@link Wallet.reset}
+     * to replay transactions from the blockchain (as if the wallet had been loaded and {@link Wallet#reset()}
      * had been called immediately thereafter).
      *
      * <p>A wallet can be unreadable for various reasons, such as inability to open the file, corrupt data, internally
@@ -565,7 +586,7 @@ public class WalletProtobufSerializer {
     }
 
     private void loadExtensions(Wallet wallet, WalletExtension[] extensionsList, Protos.Wallet walletProto) throws UnreadableWalletException {
-        final Map<String, WalletExtension> extensions = new HashMap<String, WalletExtension>();
+        final Map<String, WalletExtension> extensions = new HashMap<>();
         for (WalletExtension e : extensionsList)
             extensions.put(e.getWalletExtensionID(), e);
         // The Wallet object, if subclassed, might have added some extensions to itself already. In that case, don't
@@ -580,6 +601,8 @@ public class WalletProtobufSerializer {
                         throw new UnreadableWalletException("Unknown mandatory extension in wallet: " + id);
                     else
                         log.error("Unknown extension in wallet {}, ignoring", id);
+                } else if (requireAllExtensionsKnown) {
+                    throw new UnreadableWalletException("Unknown extension in wallet: " + id);
                 }
             } else {
                 log.info("Loading wallet extension {}", id);
@@ -589,6 +612,11 @@ public class WalletProtobufSerializer {
                     if (extProto.getMandatory() && requireMandatoryExtensions) {
                         log.error("Error whilst reading mandatory extension {}, failing to read wallet", id);
                         throw new UnreadableWalletException("Could not parse mandatory extension in wallet: " + id);
+                    } else if (requireAllExtensionsKnown) {
+                        log.error("Error whilst reading extension {}, failing to read wallet", id);
+                        throw new UnreadableWalletException("Could not parse extension in wallet: " + id);
+                    } else {
+                        log.warn("Error whilst reading extension {}, ignoring extension", id, e);
                     }
                 }
             }
@@ -607,6 +635,7 @@ public class WalletProtobufSerializer {
     }
 
     private void readTransaction(Protos.Transaction txProto, NetworkParameters params) throws UnreadableWalletException {
+        //Modifed for Dash to determine which kind of Transaction to create (tx or ix).
         boolean isIX = txProto.getConfidence().hasIxType() && txProto.getConfidence().getIxType() != Protos.TransactionConfidence.IXType.IX_NONE;
         Transaction tx = !isIX ? new Transaction(params) : new TransactionLockRequest(params);
 
@@ -785,8 +814,9 @@ public class WalletProtobufSerializer {
                 throw new UnreadableWalletException("Peer IP address does not have the right length", e);
             }
             int port = proto.getPort();
-            PeerAddress address = new PeerAddress(params, ip, port);
-            address.setServices(BigInteger.valueOf(proto.getServices()));
+            int protocolVersion = params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.CURRENT);
+            BigInteger services = BigInteger.valueOf(proto.getServices());
+            PeerAddress address = new PeerAddress(params, ip, port, protocolVersion, services);
             confidence.markBroadcastBy(address);
         }
         if (confidenceProto.hasLastBroadcastedAt())

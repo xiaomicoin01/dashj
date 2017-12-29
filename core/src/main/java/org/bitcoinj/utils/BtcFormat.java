@@ -924,7 +924,7 @@ public abstract class BtcFormat extends Format {
     public static BtcFormat getCoinInstance() { return getCoinInstance(defaultLocale()); }
 
     private static List<Integer> boxAsList(int[] elements) throws IllegalArgumentException {
-        List<Integer> list = new ArrayList<Integer>(elements.length);
+        List<Integer> list = new ArrayList<>(elements.length);
         for (int e : elements) {
             checkArgument(e > 0, "Size of decimal group must be at least one.");
             list.add(e);
@@ -1379,7 +1379,6 @@ public abstract class BtcFormat extends Format {
      *
      * @param scale Number of places the decimal point will be shifted when formatting
      *              a quantity of satoshis.
-     * @return The DecimalFormatSymbols before changing
      */
     protected static void prefixUnitsIndicator(DecimalFormat numberFormat, int scale) {
         checkState(Thread.holdsLock(numberFormat)); // make sure caller intends to reset before changing
