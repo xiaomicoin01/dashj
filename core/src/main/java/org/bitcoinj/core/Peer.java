@@ -1461,7 +1461,7 @@ public class Peer extends PeerSocketHandler {
         //masternodepings
 
         //if(blockChain.getBestChainHeight() > (this.getBestHeight() - 100))
-        if(context.masternodeSync.syncFlags.contains(MasternodeSync.SYNC_FLAGS.SYNC_MASTERNODE_LIST))
+        if(context.masternodeSync != null && context.masternodeSync.syncFlags.contains(MasternodeSync.SYNC_FLAGS.SYNC_MASTERNODE_LIST))
         {
 
            //if(context.masternodeSync.isSynced()) {
@@ -1509,7 +1509,7 @@ public class Peer extends PeerSocketHandler {
             //}
         }
 
-        if(context.masternodeSync.syncFlags.contains(MasternodeSync.SYNC_FLAGS.SYNC_GOVERNANCE)) {
+        if(context.masternodeSync != null && context.masternodeSync.syncFlags.contains(MasternodeSync.SYNC_FLAGS.SYNC_GOVERNANCE)) {
             it = goveranceObjects.iterator();
 
             while (it.hasNext()) {
