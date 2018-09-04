@@ -6,6 +6,7 @@ import org.bitcoinj.governance.GovernanceVote;
 import org.bitcoinj.governance.GovernanceVoteBroadcast;
 import org.bitcoinj.governance.GovernanceVoting;
 
+import java.io.File;
 import java.util.ArrayList;
 
 import static org.bitcoinj.governance.GovernanceVote.VoteOutcome.VOTE_OUTCOME_NONE;
@@ -18,7 +19,7 @@ public class MasternodeControl {
     /**
      * The Config.
      */
-    MasternodeConfig masternodeConfig;
+    public MasternodeConfig masternodeConfig;
     /**
      * The Context.
      */
@@ -28,11 +29,21 @@ public class MasternodeControl {
      * Instantiates a new Masternode control.
      *
      * @param context              the context
+     * @param masternodeConfigFile the masternode config file
+     */
+    public MasternodeControl(Context context, File masternodeConfigFile) {
+        this.context = context;
+        masternodeConfig = new MasternodeConfig(masternodeConfigFile);
+    }
+
+    /**
+     * Instantiates a new Masternode control.
+     *
+     * @param context              the context
      * @param masternodeConfigFile the masternode config file name
      */
     public MasternodeControl(Context context, String masternodeConfigFile) {
-        this.context = context;
-        masternodeConfig = new MasternodeConfig(masternodeConfigFile);
+        this(context, new File(masternodeConfigFile));
     }
 
     public boolean load() {

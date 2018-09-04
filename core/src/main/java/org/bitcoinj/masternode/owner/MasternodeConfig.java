@@ -75,9 +75,9 @@ public class MasternodeConfig {
 
     protected File masternodeConfigFile;
 
-    public MasternodeConfig(String configFile) {
+    public MasternodeConfig(File masternodeConfigFile) {
         entries = new ArrayList<MasternodeEntry>();
-        masternodeConfigFile = new File(configFile);
+        this.masternodeConfigFile = masternodeConfigFile;
     }
 
     public void add(String alias, String ip, String privKey, String txHash, String outputIndex) {

@@ -1,9 +1,16 @@
 package org.bitcoinj.core;
 
+import org.bitcoinj.utils.ListenerRegistration;
+import org.bitcoinj.utils.Threading;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
 
 /**
  * Created by Hash Engineering on 2/20/2016.
@@ -55,6 +62,7 @@ public class SporkManager {
         mapSporks = new HashMap<Sha256Hash, SporkMessage>();
         mapSporksActive = new HashMap<Integer, SporkMessage>();
         setSporkAddress(context.getParams().getSporkAddress());
+        eventListeners = new CopyOnWriteArrayList<ListenerRegistration<SporkSyncListener>>();
     }
 
     void setBlockChain(AbstractBlockChain blockChain)
@@ -85,6 +93,7 @@ public class SporkManager {
 
             mapSporks.put(hash, spork);
             mapSporksActive.put(spork.nSporkID, spork);
+            queueOnUpdate(spork);
             relay(spork);
 
             //does a task if needed
@@ -112,8 +121,9 @@ public class SporkManager {
 
     }*/
 
-
-
+    public boolean isSporkActive(SporkMessage spork) {
+        return isSporkActive(spork.nSporkID);
+    }
 
     // grab the spork, otherwise say it's off
     public boolean isSporkActive(int nSporkID)
@@ -258,4 +268,56 @@ public class SporkManager {
         return true;
     }
 
+    //region Event listeners
+    private transient CopyOnWriteArrayList<ListenerRegistration<SporkSyncListener>> eventListeners;
+
+    /**
+     * Adds an event listener object. Methods on this object are called when something interesting happens,
+     * like receiving money. Runs the listener methods in the user thread.
+     */
+    public void addEventListener(SporkSyncListener listener) {
+        addEventListener(listener, Threading.USER_THREAD);
+    }
+
+    /**
+     * Adds an event listener object. Methods on this object are called when something interesting happens,
+     * like receiving money. The listener is executed by the given executor.
+     */
+    public void addEventListener(SporkSyncListener listener, Executor executor) {
+        // This is thread safe, so we don't need to take the lock.
+        eventListeners.add(new ListenerRegistration<SporkSyncListener>(listener, executor));
+    }
+
+    /**
+     * Removes the given event listener object. Returns true if the listener was removed, false if that listener
+     * was never added.
+     */
+    public boolean removeEventListener(SporkSyncListener listener) {
+        //keychain.removeEventListener(listener);
+        return ListenerRegistration.removeFromList(listener, eventListeners);
+    }
+
+    public void queueOnUpdate(final SporkMessage spork) {
+        //checkState(lock.isHeldByCurrentThread());
+        for (final ListenerRegistration<SporkSyncListener> registration : eventListeners) {
+            if (registration.executor == Threading.SAME_THREAD) {
+                registration.listener.onUpdate(spork);
+            } else {
+                registration.executor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        registration.listener.onUpdate(spork);
+                    }
+                });
+            }
+        }
+    }
+
+    public List<SporkMessage> getSporks() {
+        List<SporkMessage> sporkList = new ArrayList<SporkMessage>(mapSporksActive.size());
+        for (Map.Entry<Sha256Hash, SporkMessage> entry : mapSporks.entrySet()) {
+            sporkList.add(entry.getValue());
+        }
+        return sporkList;
+    }
 }

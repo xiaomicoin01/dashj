@@ -168,4 +168,7 @@ public class SporkMessage extends Message{
         return true;
     }
 
+    public long getTimeSigned() {
+        return nTimeSigned;
+    }
 }

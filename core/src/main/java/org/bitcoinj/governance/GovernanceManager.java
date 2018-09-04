@@ -2,6 +2,7 @@ package org.bitcoinj.governance;
 
 import org.bitcoinj.core.*;
 import org.bitcoinj.core.listeners.TransactionConfidenceEventListener;
+import org.bitcoinj.governance.listeners.GovernanceObjectAddedEventListener;
 import org.bitcoinj.governance.listeners.GovernanceVoteConfidenceEventListener;
 import org.bitcoinj.utils.*;
 import org.bitcoinj.wallet.Wallet;
@@ -700,6 +701,7 @@ public class GovernanceManager extends AbstractManager {
 
             // INSERT INTO OUR GOVERNANCE OBJECT MEMORY
             mapObjects.put(nHash, govobj);
+            governanceObjectAddedChanged(nHash, govobj);
             unCache();
 
             // SHOULD WE ADD THIS OBJECT TO ANY OTHER MANANGERS?
@@ -1582,4 +1584,30 @@ public class GovernanceManager extends AbstractManager {
         }
     }
 
+    private final CopyOnWriteArrayList<ListenerRegistration<GovernanceObjectAddedEventListener>> governanceObjectAddedListeners
+            = new CopyOnWriteArrayList<ListenerRegistration<GovernanceObjectAddedEventListener>>();
+
+    public void addGovernanceObjectAddedEventListener(GovernanceObjectAddedEventListener listener) {
+        addGovernanceObjectAddedEventListener(Threading.USER_THREAD, listener);
+    }
+
+    public void addGovernanceObjectAddedEventListener(Executor executor, GovernanceObjectAddedEventListener listener) {
+        governanceObjectAddedListeners.add(new ListenerRegistration<GovernanceObjectAddedEventListener>(listener, executor));
+    }
+
+    private void governanceObjectAddedChanged(final Sha256Hash nHash, final GovernanceObject object) {
+        checkState(lock.isHeldByCurrentThread());
+        for (final ListenerRegistration<GovernanceObjectAddedEventListener> registration : governanceObjectAddedListeners) {
+            if (registration.executor == Threading.SAME_THREAD) {
+                registration.listener.onGovernanceObjectAdded(nHash, object);
+            } else {
+                registration.executor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        registration.listener.onGovernanceObjectAdded(nHash, object);
+                    }
+                });
+            }
+        }
+    }
 }
