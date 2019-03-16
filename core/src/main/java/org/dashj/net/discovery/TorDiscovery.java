@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.bitcoinj.net.discovery;
+package org.dashj.net.discovery;
 
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
@@ -23,8 +23,8 @@ import com.subgraph.orchid.*;
 import com.subgraph.orchid.circuits.path.*;
 import com.subgraph.orchid.data.*;
 import com.subgraph.orchid.data.exitpolicy.*;
-import org.bitcoinj.core.*;
-import org.bitcoinj.utils.*;
+import org.dashj.core.*;
+import org.dashj.utils.*;
 import org.slf4j.*;
 
 import java.net.*;
