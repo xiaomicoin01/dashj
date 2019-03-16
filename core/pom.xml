@@ -279,7 +279,7 @@
                 <configuration>
                     <excludes>
                         <exclude>**/Protos*.class</exclude> <!-- Exclude generated protobuf classes -->
-                        <exclude>org/bitcoinj/jni/*</exclude> <!-- Exclude JNI classes -->
+                        <exclude>org.dashj.jni/*</exclude> <!-- Exclude JNI classes -->
                         <exclude>org/bitcoin/*</exclude> <!-- Exclude native classes -->
                     </excludes>
                 </configuration>
@@ -435,7 +435,7 @@
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>org.bitcoinj</groupId>
+            <groupId>org.dashj./groupId>
             <artifactId>orchid</artifactId>
             <version>1.2.1</version>
         </dependency>
